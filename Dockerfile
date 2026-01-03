@@ -2,42 +2,39 @@ FROM debian:12
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Basic system update
 RUN apt update && apt upgrade -y
 
-# Install desktop + RDP
+# Required packages
 RUN apt install -y \
-    xfce4 \
-    xfce4-goodies \
+    xfce4 xfce4-goodies \
     xrdp \
-    sudo \
     dbus-x11 \
-    wget \
-    curl \
-    git \
+    sudo \
+    openssh-server \
+    curl wget nano \
     firefox-esr \
-    xterm \
-    nano \
     ca-certificates
 
-# Create user (VPS user)
+# SSH fix
+RUN mkdir /var/run/sshd
+
+# User create
 RUN useradd -m -s /bin/bash admin \
     && echo "admin:admin123" | chpasswd \
     && adduser admin sudo
 
-# XFCE session for RDP
+# XFCE session
 RUN echo "xfce4-session" > /home/admin/.xsession \
     && chown admin:admin /home/admin/.xsession
 
-# XRDP Fix
-RUN sed -i 's/port=3389/port=3389/g' /etc/xrdp/xrdp.ini \
-    && sed -i 's/max_bpp=32/max_bpp=24/g' /etc/xrdp/xrdp.ini
-
-# Allow XRDP to use SSL
+# XRDP permission
 RUN adduser xrdp ssl-cert
 
-# Expose RDP port
-EXPOSE 3389
+# Copy start script
+COPY start.sh /start.sh
+RUN chmod +x /start.sh
 
-# Start services
-CMD service dbus start && service xrdp start && tail -f /dev/null
+EXPOSE 3389
+EXPOSE 22
+
+CMD ["/start.sh"]
