@@ -1,19 +1,43 @@
-FROM debian
-RUN dpkg --add-architecture i386
-RUN apt update
-RUN DEBIAN_FRONTEND=noninteractive apt install wine qemu-kvm *zenhei* xz-utils dbus-x11 curl firefox-esr gnome-system-monitor mate-system-monitor  git xfce4 xfce4-terminal tightvncserver wget   -y
-RUN wget https://github.com/novnc/noVNC/archive/refs/tags/v1.2.0.tar.gz
-RUN tar -xvf v1.2.0.tar.gz
-RUN mkdir  $HOME/.vnc
-RUN echo 'admin123@a' | vncpasswd -f > $HOME/.vnc/passwd
-RUN echo '/bin/env  MOZ_FAKE_NO_SANDBOX=1  dbus-launch xfce4-session'  > $HOME/.vnc/xstartup
-RUN chmod 600 $HOME/.vnc/passwd
-RUN chmod 755 $HOME/.vnc/xstartup
-RUN echo 'whoami ' >>/luo.sh
-RUN echo 'cd ' >>/luo.sh
-RUN echo "su -l -c 'vncserver :2000 -geometry 1360x768' "  >>/luo.sh
-RUN echo 'cd /noVNC-1.2.0' >>/luo.sh
-RUN echo './utils/launch.sh  --vnc localhost:7900 --listen 8900 ' >>/luo.sh
-RUN chmod 755 /luo.sh
-EXPOSE 8900
-CMD  /luo.sh
+FROM debian:12
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Basic system update
+RUN apt update && apt upgrade -y
+
+# Install desktop + RDP
+RUN apt install -y \
+    xfce4 \
+    xfce4-goodies \
+    xrdp \
+    sudo \
+    dbus-x11 \
+    wget \
+    curl \
+    git \
+    firefox-esr \
+    xterm \
+    nano \
+    ca-certificates
+
+# Create user (VPS user)
+RUN useradd -m -s /bin/bash admin \
+    && echo "admin:admin123" | chpasswd \
+    && adduser admin sudo
+
+# XFCE session for RDP
+RUN echo "xfce4-session" > /home/admin/.xsession \
+    && chown admin:admin /home/admin/.xsession
+
+# XRDP Fix
+RUN sed -i 's/port=3389/port=3389/g' /etc/xrdp/xrdp.ini \
+    && sed -i 's/max_bpp=32/max_bpp=24/g' /etc/xrdp/xrdp.ini
+
+# Allow XRDP to use SSL
+RUN adduser xrdp ssl-cert
+
+# Expose RDP port
+EXPOSE 3389
+
+# Start services
+CMD service dbus start && service xrdp start && tail -f /dev/null
